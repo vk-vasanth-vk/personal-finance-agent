@@ -7,6 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "finagent",
     "userInterfaceStyle": "automatic",
+    "developmentClient": true,
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -17,7 +18,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.vkdev.finagent"
     },
     "web": {
       "output": "static",
@@ -35,11 +37,18 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-dev-client"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a61bace9-6068-4774-8e95-4b31ad9b1017"
+      }
     }
   }
 }
