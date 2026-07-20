@@ -37,7 +37,9 @@
         }
       ],
       "expo-sqlite",
-      "expo-dev-client"
+      "expo-dev-client",
+      "expo-sms-listener",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -48,6 +50,7 @@
       "eas": {
         "projectId": "a61bace9-6068-4774-8e95-4b31ad9b1017"
       }
-    }
+    },
+    "owner": "vk-dev"
   }
 }
