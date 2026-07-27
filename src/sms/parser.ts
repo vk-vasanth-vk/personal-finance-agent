@@ -1,4 +1,5 @@
 import type { NewTransaction } from "@/db";
+import { categorizeTransaction } from "@/sms/categories";
 import type { SmsMessage } from "expo-sms-listener";
 
 const DEBIT_WORDS =
@@ -7,43 +8,6 @@ const CREDIT_WORDS =
   /\b(credited|received|refund(?:ed)?|reversal|reversed|cashback)\b/i;
 const NON_TRANSACTION_WORDS =
   /\b(otp|one[- ]time password|verification code|login code)\b/i;
-
-const CATEGORY_RULES: { category: string; keywords: RegExp }[] = [
-  {
-    category: "Food",
-    keywords:
-      /\b(swiggy|zomato|restaurant|cafe|coffee|food|bakery|dominos|mcdonald|kfc)\b/i,
-  },
-  {
-    category: "Travel",
-    keywords:
-      /\b(uber|ola|rapido|irctc|railway|airline|flight|petrol|diesel|fuel|metro|fastag)\b/i,
-  },
-  {
-    category: "Shopping",
-    keywords:
-      /\b(amazon|flipkart|myntra|ajio|meesho|mall|store|mart|retail)\b/i,
-  },
-  {
-    category: "Bills",
-    keywords:
-      /\b(electricity|broadband|airtel|jio|vi |vodafone|recharge|bill|gas|water|insurance)\b/i,
-  },
-  {
-    category: "Health",
-    keywords:
-      /\b(hospital|clinic|pharmacy|medical|medicine|apollo|netmeds|pharmeasy)\b/i,
-  },
-  {
-    category: "Entertainment",
-    keywords:
-      /\b(netflix|spotify|prime video|hotstar|cinema|movie|bookmyshow|gaming)\b/i,
-  },
-  {
-    category: "Education",
-    keywords: /\b(school|college|university|course|udemy|book|tuition|fees?)\b/i,
-  },
-];
 
 function extractAmount(body: string): number | null {
   const currencyBefore = body.match(
@@ -85,14 +49,6 @@ function extractMerchant(body: string, sender: string): string {
     : cleanMerchant(sender);
 
   return merchant || "Unknown merchant";
-}
-
-export function categorizeTransaction(merchant: string, body: string): string {
-  const searchableText = `${merchant} ${body}`;
-  return (
-    CATEGORY_RULES.find(({ keywords }) => keywords.test(searchableText))
-      ?.category ?? "Other"
-  );
 }
 
 function createSmsHash(message: SmsMessage): string {

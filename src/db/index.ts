@@ -79,6 +79,15 @@ export function getExpenses(): Expenses {
   return row ? (JSON.parse(row.expenses) as Expenses) : {};
 }
 
+/** Add amount into a category total (creates the category if missing). */
+export function addExpenseAmount(category: string, amount: number): Expenses {
+  const expenses = getExpenses();
+  const key = category.trim() || "Other";
+  expenses[key] = (expenses[key] ?? 0) + amount;
+  saveExpenses(expenses);
+  return expenses;
+}
+
 export function insertTransaction(transaction: NewTransaction): number | null {
   const result = db.runSync(
     `INSERT OR IGNORE INTO transactions
@@ -97,25 +106,18 @@ export function insertTransaction(transaction: NewTransaction): number | null {
   return result.changes > 0 ? result.lastInsertRowId : null;
 }
 
-export function getTransactions(limit = 100): Transaction[] {
-  return db.getAllSync<{
-    id: number;
-    amount: number;
-    merchant: string;
-    category: string;
-    sender: string;
-    sms_body: string;
-    sms_hash: string;
-    occurred_at: number;
-    created_at: number;
-  }>(
-    `SELECT id, amount, merchant, category, sender, sms_body, sms_hash,
-            occurred_at, created_at
-     FROM transactions
-     ORDER BY occurred_at DESC
-     LIMIT ?`,
-    limit
-  ).map((row) => ({
+function mapTransactionRow(row: {
+  id: number;
+  amount: number;
+  merchant: string;
+  category: string;
+  sender: string;
+  sms_body: string;
+  sms_hash: string;
+  occurred_at: number;
+  created_at: number;
+}): Transaction {
+  return {
     id: row.id,
     amount: row.amount,
     merchant: row.merchant,
@@ -125,5 +127,62 @@ export function getTransactions(limit = 100): Transaction[] {
     smsHash: row.sms_hash,
     occurredAt: row.occurred_at,
     createdAt: row.created_at,
-  }));
+  };
+}
+
+export function getTransactions(limit = 100): Transaction[] {
+  return db
+    .getAllSync<{
+      id: number;
+      amount: number;
+      merchant: string;
+      category: string;
+      sender: string;
+      sms_body: string;
+      sms_hash: string;
+      occurred_at: number;
+      created_at: number;
+    }>(
+      `SELECT id, amount, merchant, category, sender, sms_body, sms_hash,
+              occurred_at, created_at
+       FROM transactions
+       ORDER BY occurred_at DESC
+       LIMIT ?`,
+      limit
+    )
+    .map(mapTransactionRow);
+}
+
+export function getUncategorizedTransactions(): Transaction[] {
+  return db
+    .getAllSync<{
+      id: number;
+      amount: number;
+      merchant: string;
+      category: string;
+      sender: string;
+      sms_body: string;
+      sms_hash: string;
+      occurred_at: number;
+      created_at: number;
+    }>(
+      `SELECT id, amount, merchant, category, sender, sms_body, sms_hash,
+              occurred_at, created_at
+       FROM transactions
+       WHERE category = 'Uncategorized'
+       ORDER BY occurred_at ASC`
+    )
+    .map(mapTransactionRow);
+}
+
+export function updateTransactionCategory(
+  id: number,
+  category: string
+): boolean {
+  const result = db.runSync(
+    "UPDATE transactions SET category = ? WHERE id = ? AND category = 'Uncategorized'",
+    category.trim(),
+    id
+  );
+  return result.changes > 0;
 }

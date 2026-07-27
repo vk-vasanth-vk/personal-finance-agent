@@ -1,4 +1,12 @@
-import { initDb, insertTransaction, type Transaction } from "@/db";
+import {
+  addExpenseAmount,
+  getUncategorizedTransactions,
+  initDb,
+  insertTransaction,
+  updateTransactionCategory,
+  type Transaction,
+} from "@/db";
+import { needsUserCategory } from "@/sms/categories";
 import { parseTransactionSms } from "@/sms/parser";
 import * as Notifications from "expo-notifications";
 import {
@@ -10,6 +18,7 @@ import {
 import { DeviceEventEmitter, Platform } from "react-native";
 
 export const TRANSACTION_IMPORTED_EVENT = "transaction-imported";
+export const CATEGORIZE_NEEDED_EVENT = "categorize-needed";
 const TRANSACTION_CHANNEL_ID = "transaction-imports";
 
 Notifications.setNotificationHandler({
@@ -37,7 +46,10 @@ async function prepareNotifications(requestPermission: boolean) {
   }
 }
 
-async function notifyImportedTransaction(transaction: Transaction) {
+async function notifyImportedTransaction(
+  transaction: Transaction,
+  needsCategory: boolean
+) {
   const permission = await Notifications.getPermissionsAsync();
   if (!permission.granted) {
     return;
@@ -46,9 +58,11 @@ async function notifyImportedTransaction(transaction: Transaction) {
   await prepareNotifications(false);
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: "Expense imported",
-      body: `₹${transaction.amount.toFixed(2)} · ${transaction.merchant} · ${transaction.category}`,
-      data: { transactionId: transaction.id },
+      title: needsCategory ? "Choose a category" : "Expense imported",
+      body: needsCategory
+        ? `₹${transaction.amount.toFixed(2)} · ${transaction.merchant} — tap to categorize`
+        : `₹${transaction.amount.toFixed(2)} · ${transaction.merchant} · ${transaction.category}`,
+      data: { transactionId: transaction.id, needsCategory },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -78,9 +92,50 @@ export async function processSmsMessage(
     createdAt: Date.now(),
   };
 
+  const askUser = needsUserCategory(parsed.category);
+
+  if (!askUser) {
+    addExpenseAmount(parsed.category, parsed.amount);
+  }
+
   DeviceEventEmitter.emit(TRANSACTION_IMPORTED_EVENT);
-  await notifyImportedTransaction(transaction).catch(() => undefined);
+  if (askUser) {
+    DeviceEventEmitter.emit(CATEGORIZE_NEEDED_EVENT, transaction);
+  }
+
+  await notifyImportedTransaction(transaction, askUser).catch(() => undefined);
   return transaction;
+}
+
+export function assignTransactionCategory(
+  transactionId: number,
+  category: string
+): boolean {
+  const trimmed = category.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  initDb();
+  const pending = getUncategorizedTransactions().find(
+    (item) => item.id === transactionId
+  );
+  if (!pending) {
+    return false;
+  }
+
+  if (!updateTransactionCategory(transactionId, trimmed)) {
+    return false;
+  }
+
+  addExpenseAmount(trimmed, pending.amount);
+  DeviceEventEmitter.emit(TRANSACTION_IMPORTED_EVENT);
+  return true;
+}
+
+export function peekNextUncategorized(): Transaction | null {
+  initDb();
+  return getUncategorizedTransactions()[0] ?? null;
 }
 
 export async function isSmsImportEnabled(): Promise<boolean> {

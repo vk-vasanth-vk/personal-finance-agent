@@ -1,18 +1,25 @@
 import { Redirect, router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getSalary, initDb, saveSalary } from "@/db";
+import { colors } from "@/theme";
 
 export default function Index() {
-  // What the user is currently typing in the field
   const [input, setInput] = useState("");
-  // The salary loaded from the database (null = not set yet)
   const [salary, setSalary] = useState<number | null>(null);
-  // Have we finished reading the DB? Avoids flashing the form before we know.
   const [checked, setChecked] = useState(false);
+  const [error, setError] = useState("");
 
-  // On first render: set up the database and load any saved salary.
   useEffect(() => {
     initDb();
     setSalary(getSalary());
@@ -21,77 +28,159 @@ export default function Index() {
 
   function handleSave() {
     const value = Number(input);
-    if (!input || isNaN(value) || value <= 0) {
-      return; // ignore empty / invalid input for now
+    if (!input.trim() || isNaN(value) || value <= 0) {
+      setError("Enter a valid monthly salary amount.");
+      return;
     }
-    saveSalary(value); // persist to SQLite
-    router.replace("/expenses"); // go straight to expenses
+    saveSalary(value);
+    router.replace("/expenses");
   }
 
-  // Wait until we've read the DB before deciding what to show.
   if (!checked) {
-    return null;
+    return <View style={styles.loading} />;
   }
 
-  // Salary already set → skip this page, go straight to expenses.
   if (salary !== null) {
     return <Redirect href="/expenses" />;
   }
 
-  // First time: ask for the salary.
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Monthly Salary</Text>
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View style={styles.hero}>
+          <Text style={styles.brand}>fin-agent</Text>
+          <Text style={styles.title}>Set your monthly salary</Text>
+          <Text style={styles.subtitle}>
+            We’ll use this to track spending, remaining balance, and SMS
+            imports.
+          </Text>
+        </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your salary"
-        keyboardType="numeric"
-        value={input}
-        onChangeText={setInput}
-      />
+        <View style={styles.panel}>
+          <Text style={styles.label}>Monthly salary</Text>
+          <View style={styles.inputRow}>
+            <Text style={styles.currency}>₹</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 45000"
+              placeholderTextColor={colors.inkMuted}
+              keyboardType="numeric"
+              value={input}
+              onChangeText={(value) => {
+                setInput(value);
+                if (error) setError("");
+              }}
+              autoFocus
+            />
+          </View>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Pressable style={styles.button} onPress={handleSave}>
-        <Text style={styles.buttonText}>Save</Text>
-      </Pressable>
-    </View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.button,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={handleSave}
+          >
+            <Text style={styles.buttonText}>Continue</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.canvas,
+  },
+  loading: {
+    flex: 1,
+    backgroundColor: colors.canvas,
+  },
   container: {
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
-    gap: 16,
+    gap: 28,
+  },
+  hero: {
+    gap: 10,
+  },
+  brand: {
+    color: colors.brand,
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
   },
   title: {
-    fontSize: 24,
+    color: colors.ink,
+    fontSize: 32,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    color: colors.inkSecondary,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  panel: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    padding: 20,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  label: {
+    color: colors.inkSecondary,
+    fontSize: 13,
     fontWeight: "600",
-    textAlign: "center",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: colors.canvas,
+  },
+  currency: {
+    color: colors.inkSecondary,
+    fontSize: 22,
+    fontWeight: "700",
+    marginRight: 6,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 22,
+    fontWeight: "700",
+    color: colors.ink,
+  },
+  error: {
+    color: colors.danger,
+    fontSize: 13,
   },
   button: {
-    backgroundColor: "#208AEF",
-    borderRadius: 8,
-    paddingVertical: 14,
+    marginTop: 4,
+    backgroundColor: colors.brand,
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: "center",
+  },
+  buttonPressed: {
+    backgroundColor: colors.brandDark,
   },
   buttonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
-  },
-  result: {
-    fontSize: 18,
-    textAlign: "center",
-    marginTop: 8,
+    fontWeight: "700",
   },
 });
